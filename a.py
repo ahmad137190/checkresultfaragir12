@@ -35,7 +35,8 @@ def send_sms():
         "messageText": "جواب نهایی اومد",
         "mobiles": [
             "+989189561009",
-         #   "+989180034308"
+            "+989383734216",
+            "+989108663748"
         ],
         "sendDateTime": None
     }
@@ -75,4 +76,4 @@ while True:
             print("❌ متن 'اعلام نتیجه نهایی' پیدا نشد.")
     except Exception as e:
         print(f"⚠️ خطا: {e}")
-    time.sleep(15)
+    time.sleep(30)
