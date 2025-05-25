@@ -32,11 +32,11 @@ def send_sms():
     url = "https://api.sms.ir/v1/send/bulk"
     payload = {
         "lineNumber": 30007732003728,
-        "messageText": "جواب نهایی اومد",
+        "messageText": "تستی جواب نهایی اومد",
         "mobiles": [
             "+989189561009",
-            "+989383734216",
-            "+989108663748"
+            #"+989383734216",
+            #"+989108663748"
         ],
         "sendDateTime": None
     }
@@ -68,7 +68,7 @@ while True:
                     break
                 else:
                     print("⏳ هنوز اعلام نتیجه نهایی غیرفعال است...")
-                    #send_sms()  # ارسال پیامک در حالت غیرفعال
+                    send_sms()  # ارسال پیامک در حالت غیرفعال
                     was_disabled = is_disabled
             else:
                 print("⚠️ تگ <a> بالای متن 'اعلام نتیجه نهایی' پیدا نشد.")
@@ -76,4 +76,4 @@ while True:
             print("❌ متن 'اعلام نتیجه نهایی' پیدا نشد.")
     except Exception as e:
         print(f"⚠️ خطا: {e}")
-    time.sleep(30)
+    time.sleep(120)
