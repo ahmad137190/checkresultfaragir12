@@ -5,7 +5,7 @@ import subprocess
 import json
 
 # رشته کوکی‌ها
-cookie_string = "_ga=GA1.1.177117572.1745664028; csrftoken=WMP2Xmc572WnOHOd0zFM1HM3prWkLucTPFt06pAaGMXEqqhUSbRoaxB3QkKkNeNQ; __arcsjs=e638c4aab156162a467e3b7c402e8576; sessionid=l2exhenhogmksy0t9pofq6pk6rng2v03; _ga_VC3V6PM6FB=GS2.1.s1748169258$o49$g1$t1748169351$j0$l0$h0"
+cookie_string = "_ga=GA1.1.177117572.1745664028; csrftoken=WMP2Xmc572WnOHOd0zFM1HM3prWkLucTPFt06pAaGMXEqqhUSbRoaxB3QkKkNeNQ; sessionid=s1itp6ksyycvo8ywiwn12jkpw1ywzfhh; __arcsjs=d51fee7ea059f9ec9fc2649a7f818d5c; _ga_VC3V6PM6FB=GS2.1.s1748231659$o50$g1$t1748232304$j0$l0$h0"
 
 # تبدیل رشته به دیکشنری
 cookies = {item.split("=")[0].strip(): item.split("=")[1].strip() for item in cookie_string.split(";")}
@@ -80,4 +80,4 @@ while True:
             print("❌ متن 'اعلام نتیجه نهایی' پیدا نشد.")
     except Exception as e:
         print(f"⚠️ خطا: {e}")
-    time.sleep(120)
+    time.sleep(30)
