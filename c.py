@@ -1,3 +1,10 @@
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
 import requests
 from bs4 import BeautifulSoup
 import time
@@ -7,24 +14,71 @@ from PIL import Image
 from datetime import datetime, timedelta
 import os
 
-# تابع برای گرفتن تاریخ و زمان کنونی
-def get_current_timestamp():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+# ---------- تنظیمات Selenium ----------
+CHROMEDRIVER_PATH = '/usr/local/bin/chromedriver'
 
-# محاسبه زمان انقضای جدید (۱۴ ساعت از حالا)
+options = Options()
+# options.headless = True  # اگر می‌خواهید مرورگر بدون باز شدن ظاهر شود
+
+service = Service(CHROMEDRIVER_PATH)
+driver = webdriver.Chrome(service=service, options=options)
+
+try:
+    # باز کردن صفحه لاگین
+    driver.get("https://az12.hrtc.ir/hrt/profile/")
+
+    # صبر تا لود شدن فرم و csrfmiddlewaretoken
+    wait = WebDriverWait(driver, 10)
+    csrf_token_input = wait.until(EC.presence_of_element_located((By.NAME, 'csrfmiddlewaretoken')))
+    csrf_token = csrf_token_input.get_attribute('value')
+    print("CSRF Token:", csrf_token)
+
+    # پر کردن فرم
+    national_code_input = driver.find_element(By.ID, 'id_national_code')
+    national_code_input.send_keys('0520525264')
+
+    track_code_input = driver.find_element(By.ID, 'id_track_code')
+    track_code_input.send_keys('8777426094')
+
+    captcha_img = driver.find_element(By.CSS_SELECTOR, 'img.captcha')
+    captcha_src = captcha_img.get_attribute('src')
+    print("آدرس تصویر کپچا:", captcha_src)
+    print("لطفا کپچا را ببینید و جواب آن را وارد کنید:")
+
+    captcha_value = input("کد کپچا: ")
+
+    captcha_input = driver.find_element(By.ID, 'id_captcha_1')
+    captcha_input.send_keys(captcha_value)
+
+    submit_btn = driver.find_element(By.ID, 'submit-id-submit')
+    submit_btn.click()
+
+    # صبر کنید تا صفحه بعدی لود شود (مثلا 5 ثانیه)
+    time.sleep(5)
+
+    print("فرم ارسال شد. آدرس فعلی:", driver.current_url)
+
+    # گرفتن کوکی‌ها پس از لاگین موفق
+    selenium_cookies = driver.get_cookies()
+    # تبدیل کوکی‌ها به رشته کوکی مناسب requests
+    cookie_string = "; ".join([f"{cookie['name']}={cookie['value']}" for cookie in selenium_cookies])
+    print("کوکی‌ها:", cookie_string)
+
+finally:
+    driver.quit()
+
+# ---------- تنظیمات Requests و استفاده از کوکی‌ها ----------
+# تبدیل رشته کوکی به دیکشنری برای requests
+cookies = {item.split("=")[0].strip(): item.split("=")[1].strip() for item in cookie_string.split(";")}
+
+# محاسبه زمان انقضای جدید (۱۸ ساعت از حالا)
 expiry_time = datetime.now() + timedelta(hours=18)
 expiry_time_formatted = expiry_time.strftime("%a, %d %b %Y %H:%M:%S GMT")
 
-# رشته کوکی‌ها
-cookie_string = "_ga=GA1.1.177117572.1745664028; csrftoken=WMP2Xmc572WnOHOd0zFM1HM3prWkLucTPFt06pAaGMXEqqhUSbRoaxB3QkKkNeNQ; __arcsjs=c0e378b64544bbeb777a0ac1fd457d5e; sessionid=xavmh889v0bng2lk6v8izohl5shluu1t; _ga_VC3V6PM6FB=GS2.1.s1748317707$o56$g1$t1748317745$j0$l0$h0"
+# اگر کوکی sessionid داریم، زمان انقضا اضافه می‌کنیم
+if "sessionid" in cookies:
+    cookies["sessionid"] += f"; Expires={expiry_time_formatted}"
 
-# تبدیل رشته به دیکشنری
-cookies = {item.split("=")[0].strip(): item.split("=")[1].strip() for item in cookie_string.split(";")}
-
-# تنظیم زمان انقضای کوکی sessionid
-cookies["sessionid"] += f"; Expires={expiry_time_formatted}"
-
-# درخواست اصلی
 url = "https://az12.hrtc.ir/hrt/pl/home/"
 headers = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
@@ -41,6 +95,10 @@ headers = {
     "Upgrade-Insecure-Requests": "1",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
 }
+
+# تابع برای گرفتن تاریخ و زمان کنونی
+def get_current_timestamp():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 # تابع ارسال پیامک
 def send_sms():
@@ -84,7 +142,7 @@ def display_image_in_terminal(image_path):
     except Exception as e:
         print(f"⚠️ خطا در نمایش تصویر: {e} - {get_current_timestamp()}")
 
-# اجرای حلقه بررسی
+# ---------- حلقه بررسی تغییر وضعیت ----------
 was_disabled = True
 while True:
     try:

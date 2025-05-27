@@ -1,30 +1,90 @@
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
 import requests
 from bs4 import BeautifulSoup
 import time
 import subprocess
-import json
 from PIL import Image
 from datetime import datetime, timedelta
 import os
+import pytesseract
 
-# تابع برای گرفتن تاریخ و زمان کنونی
-def get_current_timestamp():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+# --- مسیر tesseract روی مک (اگه تو سیستم تو فرق داشت تغییر بده) ---
+pytesseract.pytesseract.tesseract_cmd = '/usr/local/bin/tesseract'
 
-# محاسبه زمان انقضای جدید (۱۴ ساعت از حالا)
-expiry_time = datetime.now() + timedelta(hours=18)
-expiry_time_formatted = expiry_time.strftime("%a, %d %b %Y %H:%M:%S GMT")
+def solve_captcha_ocr(image_path):
+    print("حل کپچا با Tesseract OCR...")
+    img = Image.open(image_path)
+    captcha_text = pytesseract.image_to_string(img).strip()
+    print("کد کپچا حدس زده شده:", captcha_text)
+    return captcha_text
 
-# رشته کوکی‌ها
-cookie_string = "_ga=GA1.1.177117572.1745664028; csrftoken=WMP2Xmc572WnOHOd0zFM1HM3prWkLucTPFt06pAaGMXEqqhUSbRoaxB3QkKkNeNQ; __arcsjs=c0e378b64544bbeb777a0ac1fd457d5e; sessionid=xavmh889v0bng2lk6v8izohl5shluu1t; _ga_VC3V6PM6FB=GS2.1.s1748317707$o56$g1$t1748317745$j0$l0$h0"
+# ----------- تنظیمات Selenium -----------
+CHROMEDRIVER_PATH = '/usr/local/bin/chromedriver'  # مسیر کروم درایور شما
 
-# تبدیل رشته به دیکشنری
+options = Options()
+# options.headless = True  # اگر میخواهید مرورگر باز نشود، این را فعال کنید
+
+service = Service(CHROMEDRIVER_PATH)
+driver = webdriver.Chrome(service=service, options=options)
+
+try:
+    driver.get("https://az12.hrtc.ir/hrt/profile/")
+    wait = WebDriverWait(driver, 10)
+
+    csrf_token_input = wait.until(EC.presence_of_element_located((By.NAME, 'csrfmiddlewaretoken')))
+    csrf_token = csrf_token_input.get_attribute('value')
+    print("CSRF Token:", csrf_token)
+
+    national_code_input = driver.find_element(By.ID, 'id_national_code')
+    national_code_input.send_keys('0520525264')  # کد ملی خودتون رو بگذارید
+
+    track_code_input = driver.find_element(By.ID, 'id_track_code')
+    track_code_input.send_keys('8777426094')  # کد رهگیری خودتون رو بگذارید
+
+    captcha_img = driver.find_element(By.CSS_SELECTOR, 'img.captcha')
+
+    # ذخیره عکس کپچا
+    captcha_image_path = 'captcha.png'
+    captcha_img.screenshot(captcha_image_path)
+    print(f"تصویر کپچا ذخیره شد: {captcha_image_path}")
+
+    # حل خودکار کپچا با Tesseract OCR
+    captcha_text = solve_captcha_ocr(captcha_image_path)
+    if not captcha_text or len(captcha_text) < 3:
+        print("حل کپچا ناموفق بود، لطفا دستی وارد کنید:")
+        captcha_text = input("کد کپچا: ")
+
+    captcha_input = driver.find_element(By.ID, 'id_captcha_1')
+    captcha_input.send_keys(captcha_text)
+
+    submit_btn = driver.find_element(By.ID, 'submit-id-submit')
+    submit_btn.click()
+
+    time.sleep(5)
+    print("فرم ارسال شد. آدرس فعلی:", driver.current_url)
+
+    selenium_cookies = driver.get_cookies()
+    cookie_string = "; ".join([f"{cookie['name']}={cookie['value']}" for cookie in selenium_cookies])
+    print("کوکی‌ها:", cookie_string)
+
+finally:
+    driver.quit()
+
+# ---------- بخش Requests و بررسی وضعیت ----------
+
 cookies = {item.split("=")[0].strip(): item.split("=")[1].strip() for item in cookie_string.split(";")}
 
-# تنظیم زمان انقضای کوکی sessionid
-cookies["sessionid"] += f"; Expires={expiry_time_formatted}"
+expiry_time = datetime.now() + timedelta(hours=18)
+expiry_time_formatted = expiry_time.strftime("%a, %d %b %Y %H:%M:%S GMT")
+if "sessionid" in cookies:
+    cookies["sessionid"] += f"; Expires={expiry_time_formatted}"
 
-# درخواست اصلی
 url = "https://az12.hrtc.ir/hrt/pl/home/"
 headers = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
@@ -42,7 +102,9 @@ headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
 }
 
-# تابع ارسال پیامک
+def get_current_timestamp():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
 def send_sms():
     sms_url = "https://api.sms.ir/v1/send/bulk"
     payload = {
@@ -69,7 +131,6 @@ def send_sms():
     except requests.exceptions.RequestException as e:
         print(f"⚠️ خطا در ارسال پیامک: {e} - {get_current_timestamp()}")
 
-# تابع نمایش تصویر در ترمینال
 def display_image_in_terminal(image_path):
     try:
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -84,14 +145,15 @@ def display_image_in_terminal(image_path):
     except Exception as e:
         print(f"⚠️ خطا در نمایش تصویر: {e} - {get_current_timestamp()}")
 
-# اجرای حلقه بررسی
 was_disabled = True
+not_found_count = 0
 while True:
     try:
         response = requests.get(url, headers=headers, cookies=cookies)
         soup = BeautifulSoup(response.text, "html.parser")
         target_p = soup.find("p", string="اعلام نتیجه نهایی")
         if target_p:
+            not_found_count = 0
             parent_a = target_p.find_parent("a")
             if parent_a:
                 is_disabled = 'disabled' in parent_a.get("class", [])
@@ -107,7 +169,14 @@ while True:
             else:
                 print(f"⚠️ تگ <a> بالای متن 'اعلام نتیجه نهایی' پیدا نشد. - {get_current_timestamp()}")
         else:
-            print(f"❌ متن 'اعلام نتیجه نهایی' پیدا نشد. - {get_current_timestamp()}")
+            not_found_count += 1
+            print(f"❌ متن 'اعلام نتیجه نهایی' پیدا نشد. - {get_current_timestamp()} ({not_found_count}/10)")
+            if not_found_count >= 10:
+                print("🔄 تلاش مجدد از ابتدا...")
+                driver = webdriver.Chrome(service=service, options=options)
+                driver.get("https://az12.hrtc.ir/hrt/profile/")
+                not_found_count = 0
+        time.sleep(30)
     except Exception as e:
         print(f"⚠️ خطا: {e} - {get_current_timestamp()}")
-    time.sleep(30)
+        time.sleep(30)
