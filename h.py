@@ -12,8 +12,9 @@ from PIL import Image
 from datetime import datetime, timedelta
 import os
 import subprocess
+import platform
 
-# ----------  تنظیمات 2Captcha ----------
+# ---------- تنظیمات 2Captcha ----------
 API_KEY_2CAPTCHA = '4492be086313f81c3baaf4738f2c9c61'
 
 def solve_captcha_2captcha(image_path):
@@ -49,7 +50,14 @@ def solve_captcha_2captcha(image_path):
 def create_driver():
     options = Options()
     options.headless = True  # اگر می‌خوای مرورگر رو ببینی، False کن
-    service = Service("D:\chromedriver.exe")  # مسیر فایل دانلود شده
+
+    # مسیر chromedriver بر اساس سیستم‌عامل
+    if platform.system() == "Windows":
+        chromedriver_path = r"D:\chromedriver.exe"
+    else:
+        chromedriver_path = "/usr/local/bin/chromedriver"
+
+    service = Service(chromedriver_path)
     return webdriver.Chrome(service=service, options=options)
 
 # ---------- ورود و گرفتن کوکی ----------
@@ -117,12 +125,12 @@ def send_sms():
             "+989999371232"
         ]
     }
-    headers = {
+    headers_sms = {
         'X-API-KEY': 'CYSZ6awyphlQemyp7zztiqwnIxr3qzi54UC1VMcenxdc1U40',
         'Content-Type': 'application/json'
     }
     try:
-        r = requests.post(sms_url, json=payload, headers=headers)
+        r = requests.post(sms_url, json=payload, headers=headers_sms)
         print(f"📩 پیامک ارسال شد: {r.text} - {get_current_timestamp()}")
     except Exception as e:
         print(f"⚠️ خطا در ارسال پیامک: {e} - {get_current_timestamp()}")
@@ -155,7 +163,15 @@ while True:
                     print(f"✅ اعلام نتیجه نهایی فعال شد! - {get_current_timestamp()}")
                     send_sms()
                     display_image_in_terminal()
-                    subprocess.run(["start", "mplay32"], shell=True)
+
+                    # اجرای پلیر صوتی بر اساس سیستم‌عامل
+                    if platform.system() == "Windows":
+                        subprocess.run(["start", "mplay32"], shell=True)
+                    elif platform.system() == "Darwin":  # macOS
+                        subprocess.run(["afplay", "/System/Library/Sounds/Ping.aiff"])
+                    else:
+                        print("🔊 صدای اعلام نتیجه فعال نشده (سیستم‌عامل ناشناخته)")
+
                     break
                 else:
                     print(f"⏳ هنوز فعال نیست... - {get_current_timestamp()}")
