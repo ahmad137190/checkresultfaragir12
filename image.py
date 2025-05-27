@@ -3,6 +3,14 @@ from PIL import Image, ImageOps, ImageFilter
 import pytesseract
 import re
 
+def normalize(text: str) -> str:
+    # ضرب‌های متداول را به * تبدیل کن
+    text = text.replace('x', '*').replace('X', '*').replace('×', '*')
+    # هر چیزی بعد از عدد دوم را حذف کن (=، ≥، <، > و …)
+    text = re.sub(r'[=≥<>].*$', '', text)
+    # فاصله‌های اضافی را حذف کن
+    return text.strip()
+
 def solve_captcha(image_filename):
     # بررسی وجود فایل در مسیر جاری
     if not os.path.isfile(image_filename):
@@ -19,7 +27,7 @@ def solve_captcha(image_filename):
 
     # استخراج متن از تصویر
     text = pytesseract.image_to_string(denoised_image, config='--psm 7')
-
+    clean = normalize(text)
     # تطبیق با عبارت ریاضی
     match = re.search(r'(\d+)\s*([+*/-])\s*(\d+)', text)
     if not match:
