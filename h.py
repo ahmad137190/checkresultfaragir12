@@ -60,7 +60,7 @@ def create_driver():
     service = Service(chromedriver_path)
     return webdriver.Chrome(service=service, options=options)
 
-# ---------- ورود و گرفتن کوکی ----------
+# ---------- ورود و گرفتن کوکی با expire 24 ساعت ----------
 def login_and_get_cookies():
     global cookie_string
     driver = create_driver()
@@ -89,18 +89,25 @@ def login_and_get_cookies():
 
         time.sleep(5)
         selenium_cookies = driver.get_cookies()
-        cookie_string = "; ".join([f"{cookie['name']}={cookie['value']}" for cookie in selenium_cookies])
-        print("🍪 کوکی‌ها:", cookie_string)
+
+        # تنظیم expire 24 ساعته
+        expiry_time = datetime.utcnow() + timedelta(hours=24)
+        cookies_with_expiry = []
+        for cookie in selenium_cookies:
+            cookie_str = f"{cookie['name']}={cookie['value']}"
+            cookie_str += f"; Expires={expiry_time.strftime('%a, %d %b %Y %H:%M:%S GMT')}"
+            cookies_with_expiry.append(cookie_str)
+
+        cookie_string = "; ".join(cookies_with_expiry)
+        print("🍪 کوکی‌ها با تاریخ انقضا:", cookie_string)
     finally:
         driver.quit()
 
 # ---------- شروع ورود ----------
 login_and_get_cookies()
 
-cookies = {item.split("=")[0].strip(): item.split("=")[1].strip() for item in cookie_string.split(";")}
-expiry_time = datetime.now() + timedelta(hours=18)
-if "sessionid" in cookies:
-    cookies["sessionid"] += f"; Expires={expiry_time.strftime('%a, %d %b %Y %H:%M:%S GMT')}"
+cookies = {item.split("=")[0].strip(): item.split("=")[1].strip().split(";")[0] for item in cookie_string.split(";")}
+# توجه: وقتی expire اضافه می‌کنیم، باید فقط نام و مقدار رو بگیریم برای کوکی در requests
 
 url = "https://az12.hrtc.ir/hrt/pl/home/"
 headers = {
@@ -184,7 +191,7 @@ while True:
             if not_found_count >= 10:
                 print("🔁 ورود مجدد...")
                 login_and_get_cookies()
-                cookies = {item.split("=")[0].strip(): item.split("=")[1].strip() for item in cookie_string.split(";")}
+                cookies = {item.split("=")[0].strip(): item.split("=")[1].strip().split(";")[0] for item in cookie_string.split(";")}
                 not_found_count = 0
     except Exception as e:
         print(f"⚠️ خطا: {e} - {get_current_timestamp()}")
