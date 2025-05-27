@@ -1,55 +1,37 @@
-import os
+import os, re
 from PIL import Image, ImageOps, ImageFilter
 import pytesseract
-import re
 
 def normalize(text: str) -> str:
-    # ضرب‌های متداول را به * تبدیل کن
     text = text.replace('x', '*').replace('X', '*').replace('×', '*')
-    # هر چیزی بعد از عدد دوم را حذف کن (=، ≥، <، > و …)
     text = re.sub(r'[=≥<>].*$', '', text)
-    # فاصله‌های اضافی را حذف کن
     return text.strip()
 
+def is_safe_expression(expr: str) -> bool:
+    return re.fullmatch(r'\d+[\+\-\*/]\d+', expr) is not None
+
 def solve_captcha(image_filename):
-    # بررسی وجود فایل در مسیر جاری
     if not os.path.isfile(image_filename):
-        return f"فایل '{image_filename}' در کنار فایل h.py پیدا نشد."
+        return f"فایل '{image_filename}' در کنار h.py پیدا نشد."
 
-    # بارگذاری تصویر
-    image = Image.open(image_filename)
+    img = Image.open(image_filename)
+    gray = img.convert('L')
+    contrast = ImageOps.autocontrast(gray)
+    binary = contrast.point(lambda x: 0 if x < 140 else 255, '1')
+    clean_img = binary.filter(ImageFilter.MedianFilter(3))
 
-    # پیش‌پردازش تصویر
-    gray_image = image.convert('L')
-    enhanced_image = ImageOps.autocontrast(gray_image)
-    binary_image = enhanced_image.point(lambda x: 0 if x < 140 else 255, '1')
-    denoised_image = binary_image.filter(ImageFilter.MedianFilter(size=3))
+    raw_text = pytesseract.image_to_string(clean_img, config='--psm 7')
+    text = normalize(raw_text)
 
-    # استخراج متن از تصویر
-    text = pytesseract.image_to_string(denoised_image, config='--psm 7')
-    clean = normalize(text)
-    # تطبیق با عبارت ریاضی
-    match = re.search(r'(\d+)\s*([+*/-])\s*(\d+)', text)
-    if not match:
+    print("clean:", text)  # برای دیباگ
+
+    if not is_safe_expression(text):
         return "خطا در تشخیص کپچا"
 
-    a, op, b = match.groups()
-    a, b = int(a), int(b)
-
     try:
-        if op == '+':
-            return str(a + b)
-        elif op == '-':
-            return str(a - b)
-        elif op == '*':
-            return str(a * b)
-        elif op == '/':
-            return str(a / b)
-        else:
-            return "عملگر نامشخص"
+        return str(eval(text))
     except Exception as e:
-        return f"خطا در محاسبه: {str(e)}"
+        return f"خطا در محاسبه: {e}"
 
-# اجرای مستقیم فایل
 if __name__ == "__main__":
     print(solve_captcha("captcha.png"))
